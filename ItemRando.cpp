@@ -324,11 +324,13 @@ std::ostream& operator<<(std::ostream& stream, const RandoState& status) {
 				if (warps_ss.rdbuf()->in_avail() != 0) warps_ss << ",";
 				warps_ss << "\"" << map.getName() << "\":{";
 				for (uint8_t j = 0; j < map.getWarps().size(); ++j) {
-					if (std::find(connections.begin(), connections.end(), map.getWarps()[j].get_vanilla_destination()) != connections.end()) continue;
-					connections.push_back(map.getWarps()[j].get_vanilla_destination());
-					if (warp_ss.rdbuf()->in_avail() != 0) warp_ss << ",";
-					if (map.getWarps()[j].get_map_destination() != NULL)
-						warp_ss << "\"" << map.getWarps()[j].get_vanilla_destination() << "\":\"" << map.getWarps()[j].get_map_destination()->getName() << "\"";
+					if (map.getWarps()[j].get_map_destination() != NULL) {
+						if (std::find(connections.begin(), connections.end(), map.getWarps()[j].get_vanilla_destination()) != connections.end()) continue;
+						connections.push_back(map.getWarps()[j].get_vanilla_destination());
+						if (warp_ss.rdbuf()->in_avail() != 0) warp_ss << ",";
+						if (map.getWarps()[j].get_map_destination() != NULL)
+							warp_ss << "\"" << map.getWarps()[j].get_vanilla_destination() << "\":\"" << map.getWarps()[j].get_map_destination()->getName() << "\"";
+					}
 				}
 				warps_ss << warp_ss.str();
 				warps_ss << "}";
