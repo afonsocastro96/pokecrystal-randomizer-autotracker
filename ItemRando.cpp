@@ -1,11 +1,15 @@
-#include <windows.h>
-#include <Psapi.h>
-#include <tchar.h>
-#include <iostream>
-
 #include "ItemRando.hpp"
 
-std::string boolToJsonBool(bool b) { return b ? "true" : "false"; }
+#ifdef _WIN32
+#include <Psapi.h>
+#include <tchar.h>
+#endif // _WIN32
+
+#include <iostream>
+#include <algorithm>
+#include <sstream>
+
+std::string convertToJson(std::string str) {return str == "" ? "null" : "\"" + str + "\"";}
 
 // RandoState Class
 
@@ -27,6 +31,7 @@ uint8_t RandoState::getByte(LPVOID* buffer, uint8_t position) {
 	}
 }
 
+#ifdef _WIN32
 gambatte_wram_info RandoState::GetBaseAddress(DWORD processId, TCHAR* processName) {
 	TCHAR szProcessName[MAX_PATH] = TEXT("<unknown>");
 	uint32_t base_address = NULL;
@@ -78,8 +83,8 @@ void RandoState::updateBadges(HANDLE hProcess) {
 	uint8_t kanto_badges_byte = getByte(buffer, 1);
 
 	for (uint8_t i = 0; i < 8; ++i) {
-		kantoBadges[i] = kanto_badges_byte & (1<<i);
-		johtoBadges[i] = johto_badges_byte & (1<<i);
+		if (kanto_badges_byte & (1 << i) && kantoBadges[i] == "") kantoBadges[i] = currentMap->getName();
+		if (johto_badges_byte & (1 << i) && johtoBadges[i] == "") johtoBadges[i] = currentMap->getName();
 	}
 
 }
@@ -90,14 +95,15 @@ void RandoState::updateTMsAndHMs(HANDLE hProcess) {
 	SIZE_T bytes_read;
 	ReadProcessMemory(hProcess, tms_hms_pointer, buffer, TMHM_NBYTES, &bytes_read);
 
-	tmsHmsOwned[HM01] = getByte(buffer, HM01_ID);
-	tmsHmsOwned[HM02] = getByte(buffer, HM02_ID);
-	tmsHmsOwned[HM03] = getByte(buffer, HM03_ID);
-	tmsHmsOwned[HM04] = getByte(buffer, HM04_ID);
-	tmsHmsOwned[HM05] = getByte(buffer, HM05_ID);
-	tmsHmsOwned[HM06] = getByte(buffer, HM06_ID);
-	tmsHmsOwned[HM07] = getByte(buffer, HM07_ID);
-	tmsHmsOwned[TM08] = getByte(buffer, TM08_ID);
+	// Note: This works because we update the current map before everything else
+	if (getByte(buffer, HM01_ID) && tmsHmsOwned[HM01] == "") tmsHmsOwned[HM01] = currentMap->getName();
+	if (getByte(buffer, HM02_ID) && tmsHmsOwned[HM02] == "") tmsHmsOwned[HM02] = currentMap->getName();
+	if (getByte(buffer, HM03_ID) && tmsHmsOwned[HM03] == "") tmsHmsOwned[HM03] = currentMap->getName();
+	if (getByte(buffer, HM04_ID) && tmsHmsOwned[HM04] == "") tmsHmsOwned[HM04] = currentMap->getName();
+	if (getByte(buffer, HM05_ID) && tmsHmsOwned[HM05] == "") tmsHmsOwned[HM05] = currentMap->getName();
+	if (getByte(buffer, HM06_ID) && tmsHmsOwned[HM06] == "") tmsHmsOwned[HM06] = currentMap->getName();
+	if (getByte(buffer, HM07_ID) && tmsHmsOwned[HM07] == "") tmsHmsOwned[HM07] = currentMap->getName();
+	if (getByte(buffer, TM08_ID) && tmsHmsOwned[TM08] == "") tmsHmsOwned[TM08] = currentMap->getName();
 }
 
 void RandoState::updatePokegear(HANDLE hProcess) {
@@ -107,11 +113,12 @@ void RandoState::updatePokegear(HANDLE hProcess) {
 
 	ReadProcessMemory(hProcess, pokegear_pointer, buffer, POKEGEAR_NBYTES, &bytes_read);
 
+	// Note: This works because we update the current map before everything else
 	uint8_t pokegear_info = getByte(buffer, 0);
-	pokegear[POKEGEAR] = pokegear_info & (1 << POKEGEAR);
-	pokegear[MAP_CARD] = pokegear_info & (1 << MAP_CARD);
-	pokegear[RADIO_CARD] = pokegear_info & (1 << RADIO_CARD);
-	pokegear[EXPN_CARD] = pokegear_info & (1 << EXPN_CARD);
+	if (pokegear_info & (1 << POKEGEAR) && pokegear[POKEGEAR] == "") pokegear[POKEGEAR] = currentMap->getName();
+	if (pokegear_info & (1 << MAP_CARD) && pokegear[POKEGEAR] == "") pokegear[MAP_CARD] = currentMap->getName();
+	if (pokegear_info & (1 << RADIO_CARD) && pokegear[POKEGEAR] == "") pokegear[RADIO_CARD] = currentMap->getName();
+	if (pokegear_info & (1 << EXPN_CARD) && pokegear[POKEGEAR] == "") pokegear[EXPN_CARD] = currentMap->getName();
 }
 
 void RandoState::updatePokedex(HANDLE hProcess) {
@@ -122,8 +129,8 @@ void RandoState::updatePokedex(HANDLE hProcess) {
 	ReadProcessMemory(hProcess, pokedex_pointer, buffer, POKEDEX_NBYTES, &bytes_read);
 
 	uint8_t pokedex_info = getByte(buffer, 0);
-	hasPokedex = pokedex_info & (1 << POKEDEX);
-	hasUnownDex = pokedex_info & (1 << UNOWN_DEX);
+	if (pokedex_info & (1 << POKEDEX) && pokegear[POKEDEX] == "") pokegear[POKEDEX] = currentMap->getName();
+	if (pokedex_info & (1 << UNOWN_DEX) && pokegear[UNOWN_DEX] == "") pokegear[UNOWN_DEX] = currentMap->getName();
 }
 
 void RandoState::updateKeyItems(HANDLE hProcess) {
@@ -133,10 +140,11 @@ void RandoState::updateKeyItems(HANDLE hProcess) {
 	ReadProcessMemory(hProcess, keyitem_pointer, buffer, KEYITEMS_NBYTES, &bytes_read);
 
 	uint8_t nItems = getByte(buffer, 0);
-	itemsOwned.resize(nItems);
 
 	for (uint8_t i = 0; i < nItems; ++i) {
-		itemsOwned[i] = getByte(buffer, i+1);
+		if(items[getByte(buffer, i + 1)] == "")
+			// Note: This works because we update the current map before everything else
+			items[getByte(buffer, i + 1)] = currentMap->getName();
 	}
 }
 
@@ -151,8 +159,9 @@ void RandoState::updateItems(HANDLE hProcess) {
 	for (int i = 1; i < nItems; i+=2) { // We don't care about quantities
 		ITEM item = getByte(buffer, i);
 		if (item == WATER_STONE) {
-			itemsOwned.push_back(WATER_STONE);
-			return;
+			if (items[item] == "")
+				// Note: This works because we update the current map before everything else
+				items[item] = currentMap->getName();
 		}
 	}
 }
@@ -180,13 +189,13 @@ void RandoState::updateMapInfo(HANDLE hProcess) {
 			if(warp_id != -1) // Filter out map transitions (ex: New Bark to Route 29)
 				if (this->currentMap->getWarps()[warp_id].get_map_destination() == NULL) { // No need to update if we've been here before
 					this->currentMap->setWarp(warp_id, currentMap);
-					#if DEBUG
+					#ifdef DEBUG
 					std::cout << "DEBUG: Set Warp #" << warp_id + 1 << " of " << this->currentMap->getName() << " to redirect to " << currentMap->getName() << std::endl;
 					#endif // DEBUG
 					int8_t new_warp_id = currentMap->getWarpId(x, y);
 					this->currentMap->getWarpId(this->x, this->y);
 					currentMap->setWarp(new_warp_id, this->currentMap);
-					#if DEBUG
+					#ifdef DEBUG
 					std::cout << "DEBUG: Set Warp #" << new_warp_id + 1 << " of " << currentMap->getName() << " to redirect to " << this->currentMap->getName() << std::endl << std::endl;
 					#endif // DEBUG
 				}
@@ -206,30 +215,31 @@ Map* RandoState::getMap(uint8_t map_group, uint8_t map_const) {
 	throw std::invalid_argument("Unknown map");
 }
 
-RandoState::RandoState() {
-	DWORD aProcesses[1024];
-	DWORD cbNeeded;
-	DWORD cProcesses;
+RandoState::RandoState() { 
+		DWORD aProcesses[1024];
+		DWORD cbNeeded;
+		DWORD cProcesses;
 
-	// Get the list of process identifiers.
-	EnumProcesses(aProcesses, sizeof(aProcesses), &cbNeeded);
+		// Get the list of process identifiers.
+		EnumProcesses(aProcesses, sizeof(aProcesses), &cbNeeded);
 
-	// Calculate how many process identifiers were returned.
-	cProcesses = cbNeeded / sizeof(DWORD);
+		// Calculate how many process identifiers were returned.
+		cProcesses = cbNeeded / sizeof(DWORD);
 
-	// Check the names of all the processess (Case insensitive)
-	gambatte_wram_info gwi = { 0,0 };
-	for (uint32_t i = 0; i < cProcesses; i++) {
-		TCHAR name[] = TEXT("gambatte_speedrun.exe");
-		gambatte_wram_info gwi = GetBaseAddress(aProcesses[i], name);
-		if (gwi.base_address != 0) {
-			this->processId = gwi.processId;
-			this->base_address = gwi.base_address;
-			initialiseMaps();
-			return;
+		// Check the names of all the processess (Case insensitive)
+		gambatte_wram_info gwi = { 0,0 };
+		for (uint32_t i = 0; i < cProcesses; i++) {
+			TCHAR name[] = TEXT("gambatte_speedrun.exe");
+			gambatte_wram_info gwi = GetBaseAddress(aProcesses[i], name);
+			if (gwi.base_address != 0) {
+				this->processId = gwi.processId;
+				this->base_address = gwi.base_address;
+				initialiseMaps();
+				return;
+			}
 		}
-	}
-	throw std::runtime_error("Gambatte-Speedrun must be running before starting the auto-tracker!");
+		std::fill_n(items, 255, "");
+		throw std::runtime_error("Gambatte-Speedrun must be running before starting the auto-tracker!");  
 }
 
 void RandoState::updateStatus() {
@@ -237,73 +247,74 @@ void RandoState::updateStatus() {
 		PROCESS_VM_READ,
 		FALSE, this->processId);
 
+	updateMapInfo(hProcess);
 	updateBadges(hProcess);
 	updatePokedex(hProcess);
 	updatePokegear(hProcess);
 	updateKeyItems(hProcess);
 	updateItems(hProcess);
 	updateTMsAndHMs(hProcess);
-	updateMapInfo(hProcess);
 
 	CloseHandle(hProcess);
 }
+#endif // _WIN32 
 
 std::ostream& operator<<(std::ostream& stream, const RandoState& status) {
 	std::stringstream ss;
 	ss << "{";
 	ss << "\"CURRENT MAP\": \"" << status.currentMap->getName() << "\",";
 	ss << "\"COORDINATES\": \"" << "(" << +status.y << "," << +status.x << ")" << "\",";
-	ss << "\"POKEGEAR\":" << boolToJsonBool(status.pokegear[POKEGEAR]) << ",";
-	ss << "\"RADIO_CARD\":" << boolToJsonBool(status.pokegear[RADIO_CARD]) << ",";
-	ss << "\"EXPN_CARD\":" << boolToJsonBool(status.pokegear[EXPN_CARD]) << ",";
-	ss << "\"MAP_CARD\":" << boolToJsonBool(status.pokegear[MAP_CARD]) << ",";
-	ss << "\"HM01\":" << boolToJsonBool(status.tmsHmsOwned[HM01]) << ",";
-	ss << "\"HM02\":" << boolToJsonBool(status.tmsHmsOwned[HM02]) << ",";
-	ss << "\"HM03\":" << boolToJsonBool(status.tmsHmsOwned[HM03]) << ",";
-	ss << "\"HM04\":" << boolToJsonBool(status.tmsHmsOwned[HM04]) << ",";
-	ss << "\"HM05\":" << boolToJsonBool(status.tmsHmsOwned[HM05]) << ",";
-	ss << "\"HM06\":" << boolToJsonBool(status.tmsHmsOwned[HM06]) << ",";
-	ss << "\"HM07\":" << boolToJsonBool(status.tmsHmsOwned[HM07]) << ",";
-	ss << "\"TM08\":" << boolToJsonBool(status.tmsHmsOwned[TM08]) << ",";
-	ss << "\"POKEDEX\":" << boolToJsonBool(status.hasPokedex) << ",";
-	ss << "\"UNOWN_DEX\":" << boolToJsonBool(status.hasUnownDex) << ",";
-	ss << "\"ZEPHYRBADGE\":" << boolToJsonBool(status.johtoBadges[ZEPHYRBADGE]) << ",";
-	ss << "\"HIVEBADGE\":" << boolToJsonBool(status.johtoBadges[HIVEBADGE]) << ",";
-	ss << "\"PLAINBADGE\":" << boolToJsonBool(status.johtoBadges[PLAINBADGE]) << ",";
-	ss << "\"FOGBADGE\":" << boolToJsonBool(status.johtoBadges[FOGBADGE]) << ",";
-	ss << "\"MINERALBADGE\":" << boolToJsonBool(status.johtoBadges[MINERALBADGE]) << ",";
-	ss << "\"STORMBADGE\":" << boolToJsonBool(status.johtoBadges[STORMBADGE]) << ",";
-	ss << "\"GLACIERBADGE\":" << boolToJsonBool(status.johtoBadges[GLACIERBADGE]) << ",";
-	ss << "\"RISINGBADGE\":" << boolToJsonBool(status.johtoBadges[RISINGBADGE]) << ",";
-	ss << "\"BOULDERBADGE\":" << boolToJsonBool(status.kantoBadges[BOULDERBADGE]) << ",";
-	ss << "\"CASCADEBADGE\":" << boolToJsonBool(status.kantoBadges[CASCADEBADGE]) << ",";
-	ss << "\"THUNDERBADGE\":" << boolToJsonBool(status.kantoBadges[THUNDERBADGE]) << ",";
-	ss << "\"RAINBOWBADGE\":" << boolToJsonBool(status.kantoBadges[RAINBOWBADGE]) << ",";
-	ss << "\"SOULBADGE\":" << boolToJsonBool(status.kantoBadges[SOULBADGE]) << ",";
-	ss << "\"MARSHBADGE\":" << boolToJsonBool(status.kantoBadges[MARSHBADGE]) << ",";
-	ss << "\"VOLCANOBADGE\":" << boolToJsonBool(status.kantoBadges[VOLCANOBADGE]) << ",";
-	ss << "\"EARTHBADGE\":" << boolToJsonBool(status.kantoBadges[EARTHBADGE]) << ",";
-	ss << "\"SQUIRTBOTTLE\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), SQUIRTBOTTLE) != status.itemsOwned.end()) << ",";
-	ss << "\"SECRETPOTION\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), SECRETPOTION) != status.itemsOwned.end()) << ",";
-	ss << "\"CARD_KEY\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), CARD_KEY) != status.itemsOwned.end()) << ",";
-	ss << "\"S_S_TICKET\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), S_S_TICKET) != status.itemsOwned.end()) << ",";
-	ss << "\"PASS\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), PASS) != status.itemsOwned.end()) << ",";
-	ss << "\"MACHINE_PART\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), MACHINE_PART) != status.itemsOwned.end()) << ",";
-	ss << "\"CLEAR_BELL\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), CLEAR_BELL) != status.itemsOwned.end()) << ",";
-	ss << "\"RAINBOW_WING\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), RAINBOW_WING) != status.itemsOwned.end()) << ",";
-	ss << "\"SILVER_WING\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), SILVER_WING) != status.itemsOwned.end()) << ",";
-	ss << "\"BASEMENT_KEY\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), BASEMENT_KEY) != status.itemsOwned.end()) << ",";
-	ss << "\"LOST_ITEM\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), LOST_ITEM) != status.itemsOwned.end()) << ",";
-	ss << "\"RED_SCALE\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), RED_SCALE) != status.itemsOwned.end()) << ",";
-	ss << "\"MYSTERY_EGG\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), MYSTERY_EGG) != status.itemsOwned.end()) << ",";
-	ss << "\"BICYCLE\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), BICYCLE) != status.itemsOwned.end()) << ",";
-	ss << "\"BLUE_CARD\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), BLUE_CARD) != status.itemsOwned.end()) << ",";
-	ss << "\"COIN_CASE\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), COIN_CASE) != status.itemsOwned.end()) << ",";
-	ss << "\"ITEMFINDER\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), ITEMFINDER) != status.itemsOwned.end()) << ",";
-	ss << "\"OLD_ROD\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), OLD_ROD) != status.itemsOwned.end()) << ",";
-	ss << "\"GOOD_ROD\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), GOOD_ROD) != status.itemsOwned.end()) << ",";
-	ss << "\"SUPER_ROD\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), SUPER_ROD) != status.itemsOwned.end()) << ",";
-	ss << "\"WATER_STONE\":" << boolToJsonBool(std::find(status.itemsOwned.begin(), status.itemsOwned.end(), WATER_STONE) != status.itemsOwned.end()) << ",";
+	ss << "\"POKEGEAR\":" << convertToJson(status.pokegear[POKEGEAR]) << ",";
+	ss << "\"RADIO_CARD\":" << convertToJson(status.pokegear[RADIO_CARD]) << ",";
+	ss << "\"EXPN_CARD\":" << convertToJson(status.pokegear[EXPN_CARD]) << ",";
+	ss << "\"MAP_CARD\":" << convertToJson(status.pokegear[MAP_CARD]) << ",";
+	ss << "\"HM01\":" << convertToJson(status.tmsHmsOwned[HM01]) << ",";
+	ss << "\"HM02\":" << convertToJson(status.tmsHmsOwned[HM02]) << ",";
+	ss << "\"HM03\":" << convertToJson(status.tmsHmsOwned[HM03]) << ",";
+	ss << "\"HM04\":" << convertToJson(status.tmsHmsOwned[HM04]) << ",";
+	ss << "\"HM05\":" << convertToJson(status.tmsHmsOwned[HM05]) << ",";
+	ss << "\"HM06\":" << convertToJson(status.tmsHmsOwned[HM06]) << ",";
+	ss << "\"HM07\":" << convertToJson(status.tmsHmsOwned[HM07]) << ",";
+	ss << "\"TM08\":" << convertToJson(status.tmsHmsOwned[TM08]) << ",";
+	ss << "\"POKEDEX\":" << convertToJson(status.hasPokedex) << ",";
+	ss << "\"UNOWN_DEX\":" << convertToJson(status.hasUnownDex) << ",";
+	ss << "\"ZEPHYRBADGE\":" << convertToJson(status.johtoBadges[ZEPHYRBADGE]) << ",";
+	ss << "\"HIVEBADGE\":" << convertToJson(status.johtoBadges[HIVEBADGE]) << ",";
+	ss << "\"PLAINBADGE\":" << convertToJson(status.johtoBadges[PLAINBADGE]) << ",";
+	ss << "\"FOGBADGE\":" << convertToJson(status.johtoBadges[FOGBADGE]) << ",";
+	ss << "\"MINERALBADGE\":" << convertToJson(status.johtoBadges[MINERALBADGE]) << ",";
+	ss << "\"STORMBADGE\":" << convertToJson(status.johtoBadges[STORMBADGE]) << ",";
+	ss << "\"GLACIERBADGE\":" << convertToJson(status.johtoBadges[GLACIERBADGE]) << ",";
+	ss << "\"RISINGBADGE\":" << convertToJson(status.johtoBadges[RISINGBADGE]) << ",";
+	ss << "\"BOULDERBADGE\":" << convertToJson(status.kantoBadges[BOULDERBADGE]) << ",";
+	ss << "\"CASCADEBADGE\":" << convertToJson(status.kantoBadges[CASCADEBADGE]) << ",";
+	ss << "\"THUNDERBADGE\":" << convertToJson(status.kantoBadges[THUNDERBADGE]) << ",";
+	ss << "\"RAINBOWBADGE\":" << convertToJson(status.kantoBadges[RAINBOWBADGE]) << ",";
+	ss << "\"SOULBADGE\":" << convertToJson(status.kantoBadges[SOULBADGE]) << ",";
+	ss << "\"MARSHBADGE\":" << convertToJson(status.kantoBadges[MARSHBADGE]) << ",";
+	ss << "\"VOLCANOBADGE\":" << convertToJson(status.kantoBadges[VOLCANOBADGE]) << ",";
+	ss << "\"EARTHBADGE\":" << convertToJson(status.kantoBadges[EARTHBADGE]) << ",";
+	ss << "\"SQUIRTBOTTLE\":" << convertToJson(status.items[SQUIRTBOTTLE]) << ",";
+	ss << "\"SECRETPOTION\":" << convertToJson(status.items[SECRETPOTION]) << ",";
+	ss << "\"CARD_KEY\":" << convertToJson(status.items[CARD_KEY]) << ",";
+	ss << "\"S_S_TICKET\":" << convertToJson(status.items[S_S_TICKET]) << ",";
+	ss << "\"PASS\":" << convertToJson(status.items[PASS]) << ",";
+	ss << "\"MACHINE_PART\":" << convertToJson(status.items[MACHINE_PART]) << ",";
+	ss << "\"CLEAR_BELL\":" << convertToJson(status.items[CLEAR_BELL]) << ",";
+	ss << "\"RAINBOW_WING\":" << convertToJson(status.items[RAINBOW_WING]) << ",";
+	ss << "\"SILVER_WING\":" << convertToJson(status.items[SILVER_WING]) << ",";
+	ss << "\"BASEMENT_KEY\":" << convertToJson(status.items[BASEMENT_KEY]) << ",";
+	ss << "\"LOST_ITEM\":" << convertToJson(status.items[LOST_ITEM]) << ",";
+	ss << "\"RED_SCALE\":" << convertToJson(status.items[RED_SCALE]) << ",";
+	ss << "\"MYSTERY_EGG\":" << convertToJson(status.items[MYSTERY_EGG]) << ",";
+	ss << "\"BICYCLE\":" << convertToJson(status.items[BICYCLE]) << ",";
+	ss << "\"BLUE_CARD\":" << convertToJson(status.items[BLUE_CARD]) << ",";
+	ss << "\"COIN_CASE\":" << convertToJson(status.items[COIN_CASE]) << ",";
+	ss << "\"ITEMFINDER\":" << convertToJson(status.items[ITEMFINDER]) << ",";
+	ss << "\"OLD_ROD\":" << convertToJson(status.items[OLD_ROD]) << ",";
+	ss << "\"GOOD_ROD\":" << convertToJson(status.items[GOOD_ROD]) << ",";
+	ss << "\"SUPER_ROD\":" << convertToJson(status.items[SUPER_ROD]) << ",";
+	ss << "\"WATER_STONE\":" << convertToJson(status.items[WATER_STONE]) << ",";
 	ss << "\"WARPS\":{";
 
 	std::stringstream warps_ss;
@@ -1674,7 +1685,7 @@ void RandoState::initialiseMaps() {
 	map.addWarp(Warp(1, 31, "GOLDENROD_POKECENTER_1F", 3));
 	maps.push_back(map);
 
-	map = Map(12, 1, "POKEMON_FAN_CLUB");
+	map = Map(12, 7, "POKEMON_FAN_CLUB");
 	map.addWarp(Warp(2, 7, "VERMILION_CITY", 3));
 	map.addWarp(Warp(3, 7, "VERMILION_CITY", 3));
 	maps.push_back(map);
@@ -2151,14 +2162,14 @@ void RandoState::initialiseMaps() {
 	map.addWarp(Warp(6, 1, "ROUTE_6_SAFFRON_GATE", 3));
 	maps.push_back(map);
 
-	map = Map(12, 1, "ROUTE_6_SAFFRON_GATE");
+	map = Map(12, 12, "ROUTE_6_SAFFRON_GATE");
 	map.addWarp(Warp(4, 0, "SAFFRON_CITY", 12));
 	map.addWarp(Warp(5, 0, "SAFFRON_CITY", 13));
 	map.addWarp(Warp(4, 7, "ROUTE_6", 2));
 	map.addWarp(Warp(5, 7, "ROUTE_6", 2));
 	maps.push_back(map);
 
-	map = Map(12, 1, "ROUTE_6_UNDERGROUND_PATH_ENTRANCE");
+	map = Map(12, 13, "ROUTE_6_UNDERGROUND_PATH_ENTRANCE");
 	map.addWarp(Warp(3, 7, "ROUTE_6", 1));
 	map.addWarp(Warp(4, 7, "ROUTE_6", 1));
 	map.addWarp(Warp(4, 3, "UNDERGROUND_PATH", 2));
@@ -2615,7 +2626,7 @@ void RandoState::initialiseMaps() {
 	map.addWarp(Warp(5, 3, "UNION_CAVE_B1F", 5));
 	maps.push_back(map);
 
-	map = Map(12, 1, "VERMILION_CITY");
+	map = Map(12, 3, "VERMILION_CITY");
 	map.addWarp(Warp(5, 5, "VERMILION_FISHING_SPEECH_HOUSE", 1));
 	map.addWarp(Warp(9, 5, "VERMILION_POKECENTER_1F", 1));
 	map.addWarp(Warp(7, 13, "POKEMON_FAN_CLUB", 1));
@@ -2628,38 +2639,38 @@ void RandoState::initialiseMaps() {
 	map.addWarp(Warp(34, 7, "DIGLETTS_CAVE", 1));
 	maps.push_back(map);
 
-	map = Map(12, 1, "VERMILION_DIGLETTS_CAVE_SPEECH_HOUSE");
+	map = Map(12, 10, "VERMILION_DIGLETTS_CAVE_SPEECH_HOUSE");
 	map.addWarp(Warp(2, 7, "VERMILION_CITY", 6));
 	map.addWarp(Warp(3, 7, "VERMILION_CITY", 6));
 	maps.push_back(map);
 
-	map = Map(12, 1, "VERMILION_FISHING_SPEECH_HOUSE");
+	map = Map(12, 4, "VERMILION_FISHING_SPEECH_HOUSE");
 	map.addWarp(Warp(2, 7, "VERMILION_CITY", 1));
 	map.addWarp(Warp(3, 7, "VERMILION_CITY", 1));
 	maps.push_back(map);
 
-	map = Map(12, 1, "VERMILION_GYM");
+	map = Map(12, 11, "VERMILION_GYM");
 	map.addWarp(Warp(4, 17, "VERMILION_CITY", 7));
 	map.addWarp(Warp(5, 17, "VERMILION_CITY", 7));
 	maps.push_back(map);
 
-	map = Map(12, 1, "VERMILION_MAGNET_TRAIN_SPEECH_HOUSE");
+	map = Map(12, 8, "VERMILION_MAGNET_TRAIN_SPEECH_HOUSE");
 	map.addWarp(Warp(2, 7, "VERMILION_CITY", 4));
 	map.addWarp(Warp(3, 7, "VERMILION_CITY", 4));
 	maps.push_back(map);
 
-	map = Map(12, 1, "VERMILION_MART");
+	map = Map(12, 9, "VERMILION_MART");
 	map.addWarp(Warp(2, 7, "VERMILION_CITY", 5));
 	map.addWarp(Warp(3, 7, "VERMILION_CITY", 5));
 	maps.push_back(map);
 
-	map = Map(12, 1, "VERMILION_POKECENTER_1F");
+	map = Map(12, 5, "VERMILION_POKECENTER_1F");
 	map.addWarp(Warp(3, 7, "VERMILION_CITY", 2));
 	map.addWarp(Warp(4, 7, "VERMILION_CITY", 2));
 	map.addWarp(Warp(0, 7, "POKECENTER_2F", 1));
 	maps.push_back(map);
 
-	map = Map(12, 1, "VERMILION_POKECENTER_2F_BETA");
+	map = Map(12, 6, "VERMILION_POKECENTER_2F_BETA");
 	map.addWarp(Warp(0, 7, "VERMILION_POKECENTER_1F", 3));
 	maps.push_back(map);
 

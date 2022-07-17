@@ -1,17 +1,15 @@
 #pragma once
 
-#include <psapi.h>
 #include <windows.h>
 #include <vector>
 #include <string>
-#include <sstream>
 
 #include "wram_positions.hpp"
 
 // To ensure correct resolution of symbols, add Psapi.lib to TARGETLIBS
 #pragma comment(lib, "psapi.lib")
 
-#define DEBUG true
+#define DEBUG
 
 const uint8_t POKEGEAR_NBYTES = 1;
 const uint8_t POKEDEX_NBYTES = 1;
@@ -22,13 +20,15 @@ const uint8_t ITEMS_NBYTES = 41;
 const uint8_t MAPS_NBYTES = 5;
 
 class Map;
+class Warp;
+class RandoState;
 
 struct gambatte_wram_info {
 	DWORD processId;
 	uint32_t base_address;
 };
 
-std::string boolToJsonBool(bool b);
+std::string convertToJson(bool b);
 
 class Warp {
 private:
@@ -72,13 +72,14 @@ private:
 	DWORD processId = 0;
 	uint32_t base_address = 0;
 
-	std::vector<ITEM> itemsOwned;
-	bool tmsHmsOwned[8] = { false, false, false, false, false, false, false, false };
-	bool kantoBadges[8] = { false, false, false, false, false, false, false, false };
-	bool johtoBadges[8] = { false, false, false, false, false, false, false, false };
-	bool pokegear[4] = { false, false, false, false };
-	bool hasPokedex = false;
-	bool hasUnownDex = false;
+	// Sacrifice memory for the sake of speed of execution
+	std::string items[255];
+	std::string tmsHmsOwned[8] = { "", "", "", "", "", "", "", "" };
+	std::string kantoBadges[8] = { "", "", "", "", "", "", "", "" };
+	std::string johtoBadges[8] = { "", "", "", "", "", "", "", "" };
+	std::string pokegear[4] = { "", "", "", "" };
+	std::string hasPokedex = "";
+	std::string hasUnownDex = "";
 
 	std::vector<Map> maps;
 	Map* currentMap = NULL;
