@@ -66,7 +66,7 @@ With the WebSocket server being the "input" in interactions #6 and #7, in replac
 Right now, only two requests are supported, issued by sending a JSON string:
 
 - ```{"action":"stop"}``` : Closes the web socket. Useful for desktop trackers to be able to dynamically open the auto-tracker and close the WebSocket it opens in a clean way. A 1000 code (normal closure) is sent back to the client.
-- ```{"action":"read"}``` : Requests the current state of the game. The response is sent as a JSON string. Items are displayed in the format ```"ITEM": "LOCATION WHERE IT WAS FOUND"``` and warps in the format ```VANILLA WARP : ```RANDO WARP```. Example of a response (note that warps not found by the player yet are not included):
+- ```{"action":"read"}``` : Requests the current state of the game. The response is sent as a JSON string. Items are displayed in the format ```"ITEM": "LOCATION WHERE IT WAS FOUND"``` and warps in the format ```"VANILLA WARP" : "RANDO WARP"```. Example of a response (note that warps not found by the player yet are not included):
 
 ```json
 {
