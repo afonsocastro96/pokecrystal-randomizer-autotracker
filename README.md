@@ -13,7 +13,7 @@ Please note that it is still in its early stages of development, which means tha
 ## Planned future features
 
 - Add *nix support (and modularize the code in order to accomodate for it better);
-- Come up with a cleaner way to find the base address of WRAM (since we know that when the game start, we start in our room, near the left-corner of the table, we look for the sequence of bytes that represents the first tiles in memory of the room in order to find the allocated memory space for Gambatte);
+- Come up with a cleaner way to find the base address of WRAM (since we know that when the game starts, we start in our room, near the left-corner of the table, we look for the sequence of bytes that represents the first tiles in memory of the room in order to find the allocated memory space for Gambatte);
 - Improve the WebSocket endpoint API to allow for better interaction with trackers as well as proper error-handling.
 
 ## How does it work
@@ -35,7 +35,7 @@ Please note that it is still in its early stages of development, which means tha
 Right now, only two requests are supported, issued by sending a JSON string:
 
 - ```{"action":"stop"}``` : Closes the web socket. Useful for desktop trackers to be able to dynamically open the auto-tracker and close the WebSocket it opens in a clean way. A 1000 code (normal closure) is sent back to the client.
-- ```{"action":"read"}``` : Requests the current state of the game. The response is sent as a JSON string. Example of a response (note that warps not found by the player yet are not included):
+- ```{"action":"read"}``` : Requests the current state of the game. The response is sent as a JSON string. Items are displayed in the format ```"ITEM": "LOCATION WHERE IT WAS FOUND"``` and warps in the format ```VANILLA WARP : ```RANDO WARP```. Example of a response (note that warps not found by the player yet are not included):
 
 ```json
 {
