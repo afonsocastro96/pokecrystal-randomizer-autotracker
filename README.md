@@ -6,6 +6,37 @@ It works by finding where the Operating System is keeping Gambatte-speedrun's vi
 
 Please note that it is still in its early stages of development, which means that there are still features planned for the future, and bugs might still be present. As of now, only Windows is supported.
 
+## How it works
+
+In a typical Item Randomiser race/run, we have 3 entities interacting with each other:
+
+```
+#1 Game (Gambatte with a Crystal ROM attached) <-> #2 Player <-> #3 Tracker
+```
+
+There are 4 interactions at play here by these 3 entities (game, player, tracker):
+
+1) The game interacts with the player (sending inputs via the monitor with the visual display of its current state);
+2) The player interacts with the game (sending inputs through controller or keyboard);
+3) The player interacts with the tracker (sending inputs via the mouse);
+4) The tracker interacts with the player (sending inputs via the monitor by showing a simplified model of the current state of the game).
+
+This program acts as a middleman entity that establishes a connection between the game and the tracker, as shown by the following diagram:
+
+```
+#1 Game (Gambatte w/Crystal ROM attached) <-> #2 Player <-> #3 Tracker
+│                                                            ^
+└─────────────────────> #4 Auto-tracker <────────────────────┘
+```
+
+This means the creation of three new interactions:
+
+5) The game interacts with the autotracker (in a passive way, via letting its memory be sniffed to obtain the current game state)
+6) The autotracker interacts with the tracker (it opens a server and responds to requests of the tracker for the current game state)
+7) The tracker interacts with the autotracker (it connects to the server provided by the autotracker and requests the current game state to the autotracker)
+
+With the WebSocket server being the "input" in interactions #6 and #7, in replacement of the mouse used by the player in interaction #3. The player does not interact with the Auto-tracker.
+
 ## Dependencies
 
 - WebSocket++ (built on top of boost::asio): If using Visual Studio, I recommend [vcpkg](https://vcpkg.io/en/index.html) for managing dependencies.
